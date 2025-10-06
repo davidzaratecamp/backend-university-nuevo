@@ -288,9 +288,22 @@ router.put('/:id', auth, authorize('admin', 'formador'), async (req, res) => {
  */
 router.get('/my-formadores', auth, authorize('estudiante'), async (req, res) => {
   try {
+    // Obtener el administrador (Director de Formadores)
+    const [adminRows] = await pool.execute(
+      `SELECT id, name, email, profile_image, bio, created_at,
+              'Director de Formadores' as position,
+              NULL as assigned_at,
+              NULL as shared_courses,
+              0 as course_count
+       FROM users
+       WHERE role = 'admin'
+       LIMIT 1`
+    );
+
     // Obtener formadores basado en los cursos que está tomando el estudiante
-    const [rows] = await pool.execute(
+    const [formadorRows] = await pool.execute(
       `SELECT DISTINCT u.id, u.name, u.email, u.profile_image, u.bio, u.created_at,
+              'Formador' as position,
               fc.assigned_at,
               GROUP_CONCAT(DISTINCT c.title) as shared_courses,
               COUNT(DISTINCT fc.course_id) as course_count
@@ -304,7 +317,10 @@ router.get('/my-formadores', auth, authorize('estudiante'), async (req, res) => 
       [req.user.id]
     );
 
-    res.json({ formadores: rows });
+    // Combinar: primero el admin, luego los formadores
+    const allFormadores = [...adminRows, ...formadorRows];
+
+    res.json({ formadores: allFormadores });
   } catch (error) {
     console.error('Get my formadores error:', error);
     res.status(500).json({ message: 'Server error' });
