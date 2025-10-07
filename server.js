@@ -96,27 +96,38 @@ global.io = io;
 // Apply CORS first
 app.use(cors(corsOptions));
 
-// Serve static files BEFORE helmet (to avoid helmet overriding headers)
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-  next();
-}, express.static('uploads'));
-
-// Configure Helmet AFTER static files with relaxed settings
-app.use(helmet({
-  crossOriginResourcePolicy: false, // Disable for uploads
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "http:", "https:"],
-      mediaSrc: ["'self'", "http:", "https:"],
-    },
-  },
+// Serve static files with explicit CORS headers - MUST be before other middlewares
+app.use('/uploads', express.static('uploads', {
+  setHeaders: (res, path, stat) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    // Remove any security headers that might block CORS
+    res.removeHeader('X-Content-Type-Options');
+  }
 }));
+
+// Configure Helmet with conditional application (skip for /uploads)
+app.use((req, res, next) => {
+  // Skip Helmet for /uploads routes
+  if (req.path.startsWith('/uploads')) {
+    return next();
+  }
+
+  // Apply Helmet to all other routes
+  helmet({
+    crossOriginResourcePolicy: false,
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "http:", "https:"],
+        mediaSrc: ["'self'", "http:", "https:"],
+      },
+    },
+  })(req, res, next);
+});
 
 app.use(compression());
 app.use(morgan('combined'));
