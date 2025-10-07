@@ -15,7 +15,7 @@ if (!fs.existsSync(uploadsPath)) {
 
 // Configure Tus server
 const tusServer = new Server({
-  path: '/files',
+  path: '/',
   datastore: new FileStore({ directory: uploadsPath }),
   relativeLocation: true,
   namingFunction: (req) => {
