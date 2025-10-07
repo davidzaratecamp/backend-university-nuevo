@@ -41,12 +41,33 @@ const swaggerOptions = {
 
 const specs = swaggerJsdoc(swaggerOptions);
 
-app.use('/uploads', express.static('uploads'));
+// CORS configuration - allow multiple origins including production
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://10.255.255.167:5173', // Production frontend
+      'http://10.255.255.167', // Production root
+    ];
+
+    // Check if origin is allowed
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // For development, allow all origins
+      callback(null, true);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
 };
 
 // Configure Socket.IO
@@ -72,13 +93,28 @@ io.on('connection', (socket) => {
 // Make io available globally for other modules
 global.io = io;
 
+// Apply CORS first
 app.use(cors(corsOptions));
-app.use(helmet());
+
+// Configure Helmet with relaxed settings for static files
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+}));
+
 app.use(compression());
 app.use(morgan('combined'));
 app.use(limiter);
 app.use(express.json({ limit: '1gb' }));
 app.use(express.urlencoded({ extended: true, limit: '1gb' }));
+
+// Serve static files with CORS headers (AFTER cors middleware)
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static('uploads'));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
