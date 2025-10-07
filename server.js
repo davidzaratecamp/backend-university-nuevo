@@ -66,29 +66,15 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
     'Accept',
-    // Tus protocol headers
-    'Tus-Resumable',
-    'Upload-Length',
-    'Upload-Offset',
-    'Upload-Metadata',
-    'Upload-Defer-Length',
-    'Upload-Concat',
-    'X-HTTP-Method-Override',
   ],
   exposedHeaders: [
     'Content-Length',
     'Content-Type',
-    // Tus protocol headers
-    'Tus-Resumable',
-    'Upload-Offset',
-    'Upload-Length',
-    'Upload-Metadata',
-    'Location',
   ],
 };
 
@@ -180,7 +166,6 @@ app.use('/api/content-blocks', require('./routes/content-blocks'));
 app.use('/api/workshop-questions', require('./routes/workshop-questions'));
 app.use('/api/forum', require('./routes/forum'));
 app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/tus', require('./routes/tus-upload'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
