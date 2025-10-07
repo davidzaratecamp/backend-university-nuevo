@@ -18,13 +18,20 @@ const tusServer = new Server({
   path: '/',
   datastore: new FileStore({ directory: uploadsPath }),
   namingFunction: (req) => {
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(7);
-    const originalName = req.headers['upload-metadata']?.match(/filename ([^,]+)/)?.[1];
-    const decodedName = originalName ? Buffer.from(originalName, 'base64').toString('utf-8') : 'video';
-    const extension = path.extname(decodedName) || '.mp4';
-    return `${timestamp}-${randomString}${extension}`;
+    try {
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(7);
+      const originalName = req.headers['upload-metadata']?.match(/filename ([^,]+)/)?.[1];
+      const decodedName = originalName ? Buffer.from(originalName, 'base64').toString('utf-8') : 'video';
+      const extension = path.extname(decodedName) || '.mp4';
+      const filename = `${timestamp}-${randomString}${extension}`;
+      console.log('Generated filename:', filename);
+      return filename;
+    } catch (error) {
+      console.error('Error in namingFunction:', error);
+      return `${Date.now()}.mp4`;
+    }
   },
   // Allow upload to be resumed
   respectForwardedHeaders: true,
@@ -32,12 +39,16 @@ const tusServer = new Server({
   maxSize: 2 * 1024 * 1024 * 1024,
   // Events
   onUploadCreate: (req, res, upload) => {
-    console.log('Upload created:', upload.id);
+    console.log('✅ Upload created:', upload.id);
     return res;
   },
   onUploadFinish: async (req, res, upload) => {
-    console.log('Upload finished:', upload.id);
+    console.log('✅ Upload finished:', upload.id);
     console.log('File saved at:', upload.storage?.path);
+    return res;
+  },
+  onResponseError: (req, res, error) => {
+    console.error('❌ Tus response error:', error);
     return res;
   },
 });
