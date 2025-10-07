@@ -158,6 +158,7 @@ app.use('/api/content-blocks', require('./routes/content-blocks'));
 app.use('/api/workshop-questions', require('./routes/workshop-questions'));
 app.use('/api/forum', require('./routes/forum'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/tus', require('./routes/tus-upload'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
