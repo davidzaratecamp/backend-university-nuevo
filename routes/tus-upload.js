@@ -61,6 +61,21 @@ router.use('/files', auth, authorize('admin'), async (req, res, next) => {
   console.log('Tus request:', req.method, req.url);
   console.log('Base URL:', req.baseUrl);
 
+  // Intercept response to log headers
+  const originalSetHeader = res.setHeader.bind(res);
+  res.setHeader = function(name, value) {
+    if (name.toLowerCase() === 'location') {
+      console.log('📍 Location header set:', value);
+    }
+    return originalSetHeader(name, value);
+  };
+
+  const originalEnd = res.end.bind(res);
+  res.end = function(...args) {
+    console.log('Response headers:', res.getHeaders());
+    return originalEnd(...args);
+  };
+
   try {
     // Tus server handle method
     return tusServer.handle(req, res);
