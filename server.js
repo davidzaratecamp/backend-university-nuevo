@@ -53,6 +53,7 @@ const corsOptions = {
       'http://localhost:3000',
       'http://127.0.0.1:5173',
       'http://10.255.255.167:5173', // Production frontend
+      'http://10.255.255.167:3000', // Production frontend (port 3000)
       'http://10.255.255.167', // Production root
     ];
 
@@ -65,9 +66,30 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    // Tus protocol headers
+    'Tus-Resumable',
+    'Upload-Length',
+    'Upload-Offset',
+    'Upload-Metadata',
+    'Upload-Defer-Length',
+    'Upload-Concat',
+    'X-HTTP-Method-Override',
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'Content-Type',
+    // Tus protocol headers
+    'Tus-Resumable',
+    'Upload-Offset',
+    'Upload-Length',
+    'Upload-Metadata',
+    'Location',
+  ],
 };
 
 // Configure Socket.IO
