@@ -43,11 +43,8 @@ const tusServer = new Server({
 });
 
 // Apply authentication middleware and pass to Tus
-router.all('/files/*', auth, authorize('admin'), (req, res) => {
-  tusServer.handle(req, res);
-});
-
-router.all('/files', auth, authorize('admin'), (req, res) => {
+// Handle all Tus protocol routes
+router.all('/files/:id?', auth, authorize('admin'), (req, res) => {
   tusServer.handle(req, res);
 });
 
