@@ -45,7 +45,19 @@ const tusServer = new Server({
 // Apply authentication middleware and pass to Tus
 // Handle all Tus protocol routes (with and without ID)
 router.use('/files', auth, authorize('admin'), (req, res) => {
-  tusServer.handle(req, res);
+  console.log('Tus request:', req.method, req.url, req.headers);
+
+  // Handle the request and catch errors
+  tusServer.handle(req, res).catch((error) => {
+    console.error('Tus server error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Upload failed',
+        message: error.message,
+        stack: error.stack
+      });
+    }
+  });
 });
 
 // Get file info endpoint
