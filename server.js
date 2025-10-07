@@ -170,8 +170,21 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Increase server timeout for large file uploads (10 minutes)
+server.setTimeout(600000);
+
+// Increase request timeout
+server.timeout = 600000;
+
+// Set keep-alive timeout
+server.keepAliveTimeout = 610000;
+
+// Set headers timeout
+server.headersTimeout = 620000;
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
   console.log(`Socket.IO server running on port ${PORT}`);
+  console.log(`Server timeout set to 10 minutes for large uploads`);
 });
