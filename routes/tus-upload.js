@@ -15,8 +15,9 @@ if (!fs.existsSync(uploadsPath)) {
 
 // Configure Tus server
 const tusServer = new Server({
-  path: '/api/tus/files',
+  path: '/files',
   datastore: new FileStore({ directory: uploadsPath }),
+  relativeLocation: true,
   namingFunction: (req) => {
     try {
       // Generate unique filename
@@ -33,15 +34,8 @@ const tusServer = new Server({
       return `${Date.now()}.mp4`;
     }
   },
-  // Generate proper Location URLs
-  generateUrl: (req, { proto, host, path, id }) => {
-    const baseUrl = `${proto}://${host}`;
-    const fullPath = `${path}/${id}`;
-    console.log('Generated URL:', `${baseUrl}${fullPath}`);
-    return `${baseUrl}${fullPath}`;
-  },
   // Allow upload to be resumed
-  respectForwardedHeaders: true,
+  respectForwardedHeaders: false,
   // Max file size: 2GB
   maxSize: 2 * 1024 * 1024 * 1024,
   // Events
@@ -64,18 +58,12 @@ const tusServer = new Server({
 // Apply authentication middleware and pass to Tus
 // Handle all Tus protocol routes (with and without ID)
 router.use('/files', auth, authorize('admin'), async (req, res, next) => {
-  console.log('Tus request:', req.method, req.url, req.headers);
+  console.log('Tus request:', req.method, req.url);
   console.log('Base URL:', req.baseUrl);
-  console.log('Original URL:', req.originalUrl);
 
   try {
-    // Restore the full path for Tus server
-    const originalUrl = req.url;
-    req.url = `/api/tus/files${req.url === '/' ? '' : req.url}`;
-    console.log('Modified URL for Tus:', req.url);
-
     // Tus server handle method
-    await tusServer.handle(req, res);
+    return tusServer.handle(req, res);
   } catch (error) {
     console.error('Tus server error:', error);
     if (!res.headersSent) {
