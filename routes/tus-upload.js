@@ -44,11 +44,13 @@ const tusServer = new Server({
 
 // Apply authentication middleware and pass to Tus
 // Handle all Tus protocol routes (with and without ID)
-router.use('/files', auth, authorize('admin'), (req, res) => {
+router.use('/files', auth, authorize('admin'), async (req, res, next) => {
   console.log('Tus request:', req.method, req.url, req.headers);
 
-  // Handle the request and catch errors
-  tusServer.handle(req, res).catch((error) => {
+  try {
+    // Tus server handle method
+    await tusServer.handle(req, res);
+  } catch (error) {
     console.error('Tus server error:', error);
     if (!res.headersSent) {
       res.status(500).json({
@@ -57,7 +59,7 @@ router.use('/files', auth, authorize('admin'), (req, res) => {
         stack: error.stack
       });
     }
-  });
+  }
 });
 
 // Get file info endpoint
