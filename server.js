@@ -96,10 +96,26 @@ global.io = io;
 // Apply CORS first
 app.use(cors(corsOptions));
 
-// Configure Helmet with relaxed settings for static files
+// Serve static files BEFORE helmet (to avoid helmet overriding headers)
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  next();
+}, express.static('uploads'));
+
+// Configure Helmet AFTER static files with relaxed settings
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginResourcePolicy: false, // Disable for uploads
   crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "http:", "https:"],
+      mediaSrc: ["'self'", "http:", "https:"],
+    },
+  },
 }));
 
 app.use(compression());
@@ -107,14 +123,6 @@ app.use(morgan('combined'));
 app.use(limiter);
 app.use(express.json({ limit: '1gb' }));
 app.use(express.urlencoded({ extended: true, limit: '1gb' }));
-
-// Serve static files with CORS headers (AFTER cors middleware)
-app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
-  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-  next();
-}, express.static('uploads'));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
