@@ -232,6 +232,48 @@ router.delete('/student/:studentId/course/:courseId', auth, authorize('admin', '
 
 /**
  * @swagger
+ * /api/assignments/course/{courseId}/students:
+ *   get:
+ *     summary: Get students with assignment status for a course
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/course/:courseId/students', auth, authorize('admin', 'formador'), async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    // For formadores, we allow access to all courses since they can assign courses to students
+    // This is consistent with the course listing endpoint
+
+    // Get all students with their assignment status for this course
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.name, u.email, u.profile_image,
+              ca.id as assignment_id,
+              CASE WHEN ca.id IS NOT NULL THEN 1 ELSE 0 END as is_assigned
+       FROM users u
+       LEFT JOIN course_assignments ca ON u.id = ca.student_id AND ca.course_id = ?
+       WHERE u.role = 'estudiante'
+       ORDER BY is_assigned DESC, u.name ASC`,
+      [courseId]
+    );
+
+    const assignedStudents = rows.filter(student => student.is_assigned);
+    const unassignedStudents = rows.filter(student => !student.is_assigned);
+
+    res.json({ 
+      assignedStudents, 
+      unassignedStudents,
+      totalStudents: rows.length
+    });
+  } catch (error) {
+    console.error('Get course students error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
  * /api/assignments/formador-students:
  *   post:
  *     summary: Assign formador to student

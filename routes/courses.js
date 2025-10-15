@@ -30,14 +30,8 @@ router.get('/', auth, async (req, res) => {
     if (req.user.role === 'estudiante') {
       query += ' WHERE ca.student_id = ?';
       params.push(req.user.id);
-    } else if (req.user.role === 'formador') {
-      query += ` WHERE c.id IN (
-        SELECT DISTINCT course_id 
-        FROM formador_courses 
-        WHERE formador_id = ?
-      )`;
-      params.push(req.user.id);
     }
+    // Formadores can see all courses to be able to assign them to students
 
     query += ' GROUP BY c.id ORDER BY c.created_at DESC';
 

@@ -13,7 +13,7 @@ const router = express.Router();
  *     security:
  *       - bearerAuth: []
  */
-router.get('/dashboard', auth, authorize('admin'), async (req, res) => {
+router.get('/dashboard', auth, authorize('admin', 'formador'), async (req, res) => {
   try {
     // Get total users by role
     const [usersByRole] = await pool.execute(`
