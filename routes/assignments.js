@@ -275,6 +275,85 @@ router.get('/course/:courseId/students', auth, authorize('admin', 'formador'), a
 /**
  * @swagger
  * /api/assignments/formador-students:
+ *   get:
+ *     summary: Get all formador-student assignments
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/formador-students', auth, authorize('admin', 'formador'), async (req, res) => {
+  try {
+    let query = `
+      SELECT sf.*, 
+             s.name as student_name, s.email as student_email,
+             f.name as formador_name, f.email as formador_email
+      FROM student_formador sf
+      JOIN users s ON sf.student_id = s.id
+      JOIN users f ON sf.formador_id = f.id
+    `;
+
+    let params = [];
+
+    // If formador, only show their own assignments
+    if (req.user.role === 'formador') {
+      query += ' WHERE sf.formador_id = ?';
+      params = [req.user.id];
+    }
+
+    query += ' ORDER BY sf.assigned_at DESC';
+
+    const [rows] = await pool.execute(query, params);
+
+    res.json({ assignments: rows });
+  } catch (error) {
+    console.error('Get formador assignments error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/assignments/formador-students/{studentId}:
+ *   get:
+ *     summary: Get formador assignments for specific student
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/formador-students/:studentId', auth, authorize('admin', 'formador'), async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    let query = `
+      SELECT sf.*, 
+             f.name as formador_name, f.email as formador_email
+      FROM student_formador sf
+      JOIN users f ON sf.formador_id = f.id
+      WHERE sf.student_id = ?
+    `;
+
+    let params = [studentId];
+
+    // If formador, only show if they are assigned to this student
+    if (req.user.role === 'formador') {
+      query += ' AND sf.formador_id = ?';
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY sf.assigned_at DESC';
+
+    const [rows] = await pool.execute(query, params);
+
+    res.json({ assignments: rows });
+  } catch (error) {
+    console.error('Get student formador assignments error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/assignments/formador-students:
  *   post:
  *     summary: Assign formador to student
  *     tags: [Assignments]
@@ -322,6 +401,35 @@ router.post('/formador-students', auth, authorize('admin'), async (req, res) => 
     }
   } catch (error) {
     console.error('Assign formador error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/assignments/formador-students/{studentId}/{formadorId}:
+ *   delete:
+ *     summary: Remove formador assignment from student
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.delete('/formador-students/:studentId/:formadorId', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { studentId, formadorId } = req.params;
+
+    const [result] = await pool.execute(
+      'DELETE FROM student_formador WHERE student_id = ? AND formador_id = ?',
+      [studentId, formadorId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Formador assignment not found' });
+    }
+
+    res.json({ message: 'Formador assignment removed successfully' });
+  } catch (error) {
+    console.error('Remove formador assignment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
