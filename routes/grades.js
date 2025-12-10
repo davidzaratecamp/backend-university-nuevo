@@ -52,6 +52,40 @@ router.post('/quiz', auth, async (req, res) => {
       return res.status(403).json({ message: 'You can only submit your own grades' });
     }
 
+    // Get quiz questions to calculate correct score
+    const [questionRows] = await pool.execute(
+      `SELECT id, question, correct_answer, points
+       FROM quiz_questions 
+       WHERE quiz_id = ? 
+       ORDER BY order_index`,
+      [quiz_id]
+    );
+
+    if (questionRows.length === 0) {
+      return res.status(404).json({ message: 'Quiz questions not found' });
+    }
+
+    // Calculate actual score
+    let correctAnswers = 0;
+    let totalPoints = 0;
+    let correctCount = 0;
+
+    questionRows.forEach(question => {
+      totalPoints += question.points;
+      const studentAnswer = answers[question.id];
+      
+      // Convert both to numbers for proper comparison
+      const studentAnswerInt = parseInt(studentAnswer);
+      const correctAnswerInt = parseInt(question.correct_answer);
+      
+      if (studentAnswerInt === correctAnswerInt) {
+        correctAnswers += question.points;
+        correctCount++;
+      }
+    });
+
+    const calculatedPercentage = Math.round((correctAnswers / totalPoints) * 100);
+
     // Get current attempt number
     const [existingGrades] = await pool.execute(
       'SELECT MAX(attempt_number) as max_attempt FROM grades WHERE student_id = ? AND quiz_id = ?',
@@ -63,13 +97,17 @@ router.post('/quiz', auth, async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO grades (student_id, quiz_id, score, max_score, percentage, student_answers, attempt_number) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [student_id, quiz_id, score, max_score, percentage, JSON.stringify(answers), attemptNumber]
+      [student_id, quiz_id, correctAnswers, totalPoints, calculatedPercentage, JSON.stringify(answers), attemptNumber]
     );
 
     res.status(201).json({ 
       message: 'Grade submitted successfully',
       gradeId: result.insertId,
-      attemptNumber 
+      attemptNumber,
+      score: correctAnswers,
+      max_score: totalPoints,
+      percentage: calculatedPercentage,
+      correct_count: correctCount
     });
   } catch (error) {
     console.error('Submit quiz grade error:', error);
