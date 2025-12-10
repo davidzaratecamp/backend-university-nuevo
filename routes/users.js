@@ -300,21 +300,22 @@ router.get('/my-formadores', auth, authorize('estudiante'), async (req, res) => 
        LIMIT 1`
     );
 
-    // Obtener formadores basado en los cursos que está tomando el estudiante
+    // Obtener formadores directamente asignados al estudiante desde la tabla student_formador
     const [formadorRows] = await pool.execute(
-      `SELECT DISTINCT u.id, u.name, u.email, u.profile_image, u.bio, u.created_at,
+      `SELECT u.id, u.name, u.email, u.profile_image, u.bio, u.created_at,
               'Formador' as position,
-              fc.assigned_at,
+              sf.assigned_at,
               GROUP_CONCAT(DISTINCT c.title) as shared_courses,
               COUNT(DISTINCT fc.course_id) as course_count
        FROM users u
-       INNER JOIN formador_courses fc ON u.id = fc.formador_id
-       INNER JOIN course_assignments ca ON fc.course_id = ca.course_id
-       INNER JOIN courses c ON fc.course_id = c.id
-       WHERE ca.student_id = ? AND u.role = 'formador'
-       GROUP BY u.id, u.name, u.email, u.profile_image, u.bio, u.created_at, fc.assigned_at
-       ORDER BY fc.assigned_at DESC`,
-      [req.user.id]
+       INNER JOIN student_formador sf ON u.id = sf.formador_id
+       LEFT JOIN formador_courses fc ON u.id = fc.formador_id
+       LEFT JOIN course_assignments ca ON fc.course_id = ca.course_id AND ca.student_id = ?
+       LEFT JOIN courses c ON fc.course_id = c.id
+       WHERE sf.student_id = ? AND u.role = 'formador'
+       GROUP BY u.id, u.name, u.email, u.profile_image, u.bio, u.created_at, sf.assigned_at
+       ORDER BY sf.assigned_at DESC`,
+      [req.user.id, req.user.id]
     );
 
     // Combinar: primero el admin, luego los formadores

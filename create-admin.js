@@ -5,9 +5,9 @@ require('dotenv').config();
 async function createAdminUser() {
   try {
     const adminData = {
-      name: 'Administrador',
-      email: 'admin@asisteuniversity.com',
-      password: 'admin123',
+      name: 'Admin Ospina',
+      email: 'adminospina@asisteuniversity.com',
+      password: 'ospinauniversity123!',
       role: 'admin'
     };
 
@@ -20,7 +20,7 @@ async function createAdminUser() {
     if (existingUser.length > 0) {
       console.log('Admin user already exists!');
       console.log('Email:', adminData.email);
-      console.log('Password: admin123');
+      console.log('Password: ospinauniversity123!');
       return;
     }
 
@@ -36,7 +36,7 @@ async function createAdminUser() {
     console.log('Admin user created successfully!');
     console.log('ID:', result.insertId);
     console.log('Email:', adminData.email);
-    console.log('Password: admin123');
+    console.log('Password: ospinauniversity123!');
     console.log('Role:', adminData.role);
 
     // Also create a formador and estudiante for testing

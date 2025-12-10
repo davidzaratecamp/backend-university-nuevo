@@ -41,20 +41,39 @@ router.get('/posts', auth, async (req, res) => {
         ORDER BY p.created_at DESC
       `;
     } else if (req.user.role === 'estudiante') {
-      // Estudiante solo puede ver posts de formadores que enseñan sus cursos
+      // Estudiante puede ver posts de:
+      // 1. Formadores directamente asignados (student_formador)
+      // 2. Formadores que enseñan cursos que el estudiante está tomando
+      // 3. Posts de administradores
       query = `
         SELECT DISTINCT p.*, u.name as author_name, u.profile_image as author_image,
                COUNT(c.id) as comment_count
         FROM forum_posts p
         JOIN users u ON p.author_id = u.id
-        JOIN formador_courses fc ON u.id = fc.formador_id
-        JOIN course_assignments ca ON fc.course_id = ca.course_id
         LEFT JOIN forum_comments c ON p.id = c.post_id
-        WHERE ca.student_id = ?
+        WHERE (
+          -- Posts de administradores
+          u.role = 'admin'
+          OR
+          -- Posts de formadores directamente asignados
+          u.id IN (
+            SELECT sf.formador_id 
+            FROM student_formador sf 
+            WHERE sf.student_id = ?
+          )
+          OR
+          -- Posts de formadores que enseñan cursos del estudiante
+          u.id IN (
+            SELECT fc.formador_id
+            FROM formador_courses fc
+            JOIN course_assignments ca ON fc.course_id = ca.course_id
+            WHERE ca.student_id = ?
+          )
+        )
         GROUP BY p.id
         ORDER BY p.created_at DESC
       `;
-      params = [req.user.id];
+      params = [req.user.id, req.user.id];
     }
 
     const [rows] = await pool.execute(query, params);
@@ -90,12 +109,25 @@ router.post('/posts', auth, authorize('admin', 'formador'), async (req, res) => 
     // Crear notificaciones para estudiantes que pueden ver el post
     if (req.user.role === 'formador') {
       const [students] = await pool.execute(
-        `SELECT DISTINCT ca.student_id, u.name as student_name
-         FROM course_assignments ca
-         JOIN formador_courses fc ON ca.course_id = fc.course_id
-         JOIN users u ON ca.student_id = u.id
-         WHERE fc.formador_id = ?`,
-        [req.user.id]
+        `SELECT DISTINCT u.id as student_id, u.name as student_name
+         FROM users u
+         WHERE u.role = 'estudiante' AND (
+           -- Estudiantes directamente asignados
+           u.id IN (
+             SELECT sf.student_id 
+             FROM student_formador sf 
+             WHERE sf.formador_id = ?
+           )
+           OR
+           -- Estudiantes en cursos del formador
+           u.id IN (
+             SELECT ca.student_id
+             FROM course_assignments ca
+             JOIN formador_courses fc ON ca.course_id = fc.course_id
+             WHERE fc.formador_id = ?
+           )
+         )`,
+        [req.user.id, req.user.id]
       );
 
       for (const student of students) {
@@ -157,10 +189,27 @@ router.get('/posts/:id', auth, async (req, res) => {
     if (req.user.role === 'estudiante') {
       // Verificar que el estudiante pueda ver este post
       const [accessRows] = await pool.execute(
-        `SELECT 1 FROM formador_courses fc
-         JOIN course_assignments ca ON fc.course_id = ca.course_id
-         WHERE fc.formador_id = ? AND ca.student_id = ?`,
-        [post.author_id, req.user.id]
+        `SELECT 1 FROM users u
+         WHERE u.id = ? AND (
+           -- Posts de administradores
+           u.role = 'admin'
+           OR
+           -- Posts de formadores directamente asignados
+           u.id IN (
+             SELECT sf.formador_id 
+             FROM student_formador sf 
+             WHERE sf.student_id = ?
+           )
+           OR
+           -- Posts de formadores que enseñan cursos del estudiante
+           u.id IN (
+             SELECT fc.formador_id
+             FROM formador_courses fc
+             JOIN course_assignments ca ON fc.course_id = ca.course_id
+             WHERE ca.student_id = ?
+           )
+         )`,
+        [post.author_id, req.user.id, req.user.id]
       );
 
       if (accessRows.length === 0) {
@@ -239,10 +288,27 @@ router.post('/posts/:id/comments', auth, async (req, res) => {
     // Verificar permisos para estudiantes
     if (req.user.role === 'estudiante') {
       const [accessRows] = await pool.execute(
-        `SELECT 1 FROM formador_courses fc
-         JOIN course_assignments ca ON fc.course_id = ca.course_id
-         WHERE fc.formador_id = ? AND ca.student_id = ?`,
-        [postRows[0].author_id, req.user.id]
+        `SELECT 1 FROM users u
+         WHERE u.id = ? AND (
+           -- Posts de administradores
+           u.role = 'admin'
+           OR
+           -- Posts de formadores directamente asignados
+           u.id IN (
+             SELECT sf.formador_id 
+             FROM student_formador sf 
+             WHERE sf.student_id = ?
+           )
+           OR
+           -- Posts de formadores que enseñan cursos del estudiante
+           u.id IN (
+             SELECT fc.formador_id
+             FROM formador_courses fc
+             JOIN course_assignments ca ON fc.course_id = ca.course_id
+             WHERE ca.student_id = ?
+           )
+         )`,
+        [postRows[0].author_id, req.user.id, req.user.id]
       );
 
       if (accessRows.length === 0) {
