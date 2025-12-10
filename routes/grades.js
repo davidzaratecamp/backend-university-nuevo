@@ -61,9 +61,9 @@ router.post('/quiz', auth, async (req, res) => {
     const attemptNumber = (existingGrades[0].max_attempt || 0) + 1;
 
     const [result] = await pool.execute(
-      `INSERT INTO grades (student_id, quiz_id, score, max_score, percentage, attempt_number) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [student_id, quiz_id, score, max_score, percentage, attemptNumber]
+      `INSERT INTO grades (student_id, quiz_id, score, max_score, percentage, student_answers, attempt_number) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [student_id, quiz_id, score, max_score, percentage, JSON.stringify(answers), attemptNumber]
     );
 
     res.status(201).json({ 
@@ -104,9 +104,9 @@ router.post('/workshop', auth, async (req, res) => {
     const attemptNumber = (existingGrades[0].max_attempt || 0) + 1;
 
     const [result] = await pool.execute(
-      `INSERT INTO workshop_grades (student_id, workshop_id, score, max_score, percentage, attempt_number) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [student_id, workshop_id, score, max_score, percentage, attemptNumber]
+      `INSERT INTO workshop_grades (student_id, workshop_id, score, max_score, percentage, student_answers, attempt_number) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [student_id, workshop_id, score, max_score, percentage, JSON.stringify(answers), attemptNumber]
     );
 
     res.status(201).json({ 
@@ -713,6 +713,133 @@ router.get('/overall-stats', auth, authorize('admin'), async (req, res) => {
     });
   } catch (error) {
     console.error('Get overall stats error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/grades/audit/{gradeId}:
+ *   get:
+ *     summary: Audit specific grade - compare student answers vs correct answers
+ *     tags: [Grades]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: gradeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ */
+router.get('/audit/:gradeId', auth, authorize('admin', 'formador'), async (req, res) => {
+  try {
+    const { gradeId } = req.params;
+    console.log('Audit request for gradeId:', gradeId);
+
+    // Get grade with student answers
+    const [gradeRows] = await pool.execute(
+      `SELECT g.*, u.name as student_name, u.email as student_email, 
+              q.title as quiz_title, q.passing_score
+       FROM grades g
+       JOIN users u ON g.student_id = u.id
+       JOIN quizzes q ON g.quiz_id = q.id
+       WHERE g.id = ?`,
+      [gradeId]
+    );
+
+    if (gradeRows.length === 0) {
+      console.log('No grade found for ID:', gradeId);
+      return res.status(404).json({ message: 'Grade not found' });
+    }
+
+    const grade = gradeRows[0];
+    console.log('Grade found:', grade);
+
+    // Get quiz questions with correct answers
+    const [questionsRows] = await pool.execute(
+      `SELECT id, question, options, correct_answer, points
+       FROM quiz_questions
+       WHERE quiz_id = ?
+       ORDER BY order_index`,
+      [grade.quiz_id]
+    );
+
+    // Parse student answers
+    let studentAnswers = {};
+    try {
+      if (grade.student_answers) {
+        // If it's already an object (MySQL2 auto-parsing), use it directly
+        if (typeof grade.student_answers === 'object') {
+          studentAnswers = grade.student_answers;
+        } else {
+          // If it's a string, parse it
+          studentAnswers = JSON.parse(grade.student_answers);
+        }
+      }
+    } catch (error) {
+      console.log('Error parsing student_answers:', error);
+      studentAnswers = {};
+    }
+
+    // Compare answers
+    const auditResults = questionsRows.map(question => {
+      const studentAnswer = studentAnswers[question.id];
+      // Convert both to numbers for proper comparison
+      const studentAnswerInt = parseInt(studentAnswer);
+      const correctAnswerInt = parseInt(question.correct_answer);
+      const isCorrect = studentAnswerInt === correctAnswerInt;
+      const pointsEarned = isCorrect ? question.points : 0;
+
+      return {
+        question_id: question.id,
+        question: question.question,
+        options: question.options,
+        correct_answer: question.correct_answer,
+        student_answer: studentAnswer,
+        is_correct: isCorrect,
+        points_possible: question.points,
+        points_earned: pointsEarned
+      };
+    });
+
+    // Calculate totals
+    const totalPointsEarned = auditResults.reduce((sum, q) => sum + q.points_earned, 0);
+    const totalPointsPossible = auditResults.reduce((sum, q) => sum + q.points_possible, 0);
+    const calculatedPercentage = Math.round((totalPointsEarned / totalPointsPossible) * 100);
+
+    res.json({
+      grade: {
+        id: grade.id,
+        student_name: grade.student_name,
+        student_email: grade.student_email,
+        quiz_title: grade.quiz_title,
+        passing_score: grade.passing_score,
+        attempt_number: grade.attempt_number,
+        completed_at: grade.completed_at
+      },
+      stored_results: {
+        score: grade.score,
+        max_score: grade.max_score,
+        percentage: grade.percentage
+      },
+      calculated_results: {
+        score: totalPointsEarned,
+        max_score: totalPointsPossible,
+        percentage: calculatedPercentage
+      },
+      is_calculation_correct: grade.percentage == calculatedPercentage,
+      questions_audit: auditResults,
+      summary: {
+        total_questions: questionsRows.length,
+        correct_answers: auditResults.filter(q => q.is_correct).length,
+        incorrect_answers: auditResults.filter(q => !q.is_correct).length,
+        unanswered: auditResults.filter(q => q.student_answer === undefined).length
+      }
+    });
+
+  } catch (error) {
+    console.error('Audit grade error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
