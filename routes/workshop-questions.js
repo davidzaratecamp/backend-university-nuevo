@@ -46,7 +46,11 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
       option_a_image, 
       option_b_image, 
       option_c_image, 
-      option_d_image, 
+      option_d_image,
+      option_a_text,
+      option_b_text,
+      option_c_text,
+      option_d_text, 
       correct_answer, 
       points, 
       order_index 
@@ -60,25 +64,32 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
       return res.status(400).json({ message: 'Correct answer must be A, B, C, or D' });
     }
 
-    // Validate that all four options have images
-    const options = [option_a_image, option_b_image, option_c_image, option_d_image];
-    const validOptions = options.filter(option => option && option.trim());
+    // Validate that all four options have either text or image (or both)
+    const optionA = (option_a_image && option_a_image.trim()) || (option_a_text && option_a_text.trim());
+    const optionB = (option_b_image && option_b_image.trim()) || (option_b_text && option_b_text.trim());
+    const optionC = (option_c_image && option_c_image.trim()) || (option_c_text && option_c_text.trim());
+    const optionD = (option_d_image && option_d_image.trim()) || (option_d_text && option_d_text.trim());
     
-    if (validOptions.length < 4) {
-      return res.status(400).json({ message: 'All four options (A, B, C, D) must have images' });
+    if (!optionA || !optionB || !optionC || !optionD) {
+      return res.status(400).json({ message: 'All four options (A, B, C, D) must have either text or image content' });
     }
 
     const [result] = await pool.execute(
       `INSERT INTO workshop_questions 
-       (workshop_id, question, option_a_image, option_b_image, option_c_image, option_d_image, correct_answer, points, order_index) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (workshop_id, question, option_a_image, option_b_image, option_c_image, option_d_image, 
+        option_a_text, option_b_text, option_c_text, option_d_text, correct_answer, points, order_index) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         workshop_id, 
         question, 
         option_a_image || null, 
         option_b_image || null, 
         option_c_image || null, 
-        option_d_image || null, 
+        option_d_image || null,
+        option_a_text || null,
+        option_b_text || null,
+        option_c_text || null,
+        option_d_text || null, 
         correct_answer, 
         points || 1, 
         order_index || 0
@@ -95,6 +106,10 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
         option_b_image,
         option_c_image,
         option_d_image,
+        option_a_text,
+        option_b_text,
+        option_c_text,
+        option_d_text,
         correct_answer,
         points: points || 1,
         order_index: order_index || 0
@@ -123,7 +138,11 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
       option_a_image, 
       option_b_image, 
       option_c_image, 
-      option_d_image, 
+      option_d_image,
+      option_a_text,
+      option_b_text,
+      option_c_text,
+      option_d_text, 
       correct_answer, 
       points, 
       order_index 
@@ -140,6 +159,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
     const [result] = await pool.execute(
       `UPDATE workshop_questions 
        SET question = ?, option_a_image = ?, option_b_image = ?, option_c_image = ?, option_d_image = ?, 
+           option_a_text = ?, option_b_text = ?, option_c_text = ?, option_d_text = ?,
            correct_answer = ?, points = ?, order_index = ? 
        WHERE id = ?`,
       [
@@ -147,7 +167,11 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
         option_a_image || null, 
         option_b_image || null, 
         option_c_image || null, 
-        option_d_image || null, 
+        option_d_image || null,
+        option_a_text || null,
+        option_b_text || null,
+        option_c_text || null,
+        option_d_text || null, 
         correct_answer, 
         points || 1, 
         order_index || 0, 
